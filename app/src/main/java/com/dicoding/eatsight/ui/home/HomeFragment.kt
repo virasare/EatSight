@@ -18,13 +18,15 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.dicoding.eatsight.databinding.FragmentHomeBinding
-import com.dicoding.eatsight.ml.FoodsModel
-import org.tensorflow.lite.support.image.TensorImage
+import com.dicoding.eatsight.helper.ImageClassifierHelper
 
 class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
+
+    private lateinit var classifierHelper: ImageClassifierHelper
+    private lateinit var homeViewModel: HomeViewModel
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -48,11 +50,17 @@ class HomeFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val homeViewModel =
-            ViewModelProvider(this)[HomeViewModel::class.java]
-
+        homeViewModel = ViewModelProvider(this)[HomeViewModel::class.java]
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
         val root: View = binding.root
+
+        classifierHelper = ImageClassifierHelper(requireContext())
+
+        homeViewModel.currentImage.observe(viewLifecycleOwner) { bitmap ->
+            bitmap?.let {
+                binding.imageView.setImageBitmap(it)
+            }
+        }
 
         binding.cameraButton.setOnClickListener {
             if (allPermissionsGranted()) {
@@ -85,15 +93,15 @@ class HomeFragment : Fragment() {
     private val takePicturePreview =
         registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
             if (bitmap != null) {
-                binding.imageView.setImageBitmap(bitmap)
-                outputGenerator(bitmap)
+                homeViewModel.setCurrentImage(bitmap)
+                classifyImage(bitmap)
             }
         }
 
     private val onresult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            Log.i("TAG", "Result: ${result.data} ${result.resultCode}")
-            onResultReceived(GALLERY_REQUEST_CODE, result)
-        }
+        Log.i("TAG", "Result: ${result.data} ${result.resultCode}")
+        onResultReceived(GALLERY_REQUEST_CODE, result)
+    }
 
     private fun onResultReceived(requestCode: Int, result: androidx.activity.result.ActivityResult?) {
         when (requestCode) {
@@ -104,8 +112,8 @@ class HomeFragment : Fragment() {
                         val bitmap = BitmapFactory.decodeStream(
                             requireActivity().contentResolver.openInputStream(uri)
                         )
-                        binding.imageView.setImageBitmap(bitmap)
-                        outputGenerator(bitmap)
+                        homeViewModel.setCurrentImage(bitmap)
+                        classifyImage(bitmap)
                     }
                 } else {
                     Log.e("TAG", "Error selecting image")
@@ -114,25 +122,18 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun outputGenerator(bitmap: Bitmap) {
-        val foodsModel = FoodsModel.newInstance(requireContext())
-
-        // Convert bitmap into tensor flow image
-        val newBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-        val tfImage = TensorImage.fromBitmap(newBitmap)
-
-        // Process the image using the trained model and sort it in descending order
-        val outputs = foodsModel.process(tfImage)
-            .probabilityAsCategoryList.apply {
-                sortByDescending { it.score }
+    private fun classifyImage(bitmap: Bitmap) {
+        classifierHelper.classifyImage(bitmap, object : ImageClassifierHelper.ClassifierListener {
+            override fun onResults(result: String) {
+                binding.resultHere.text = result
+                Log.i("TAG", "Classification Result: $result")
             }
 
-        // Getting result with highest probability
-        val highProbabilityOutput = outputs[0]
-
-        // Setting output text
-        binding.resultHere.text = highProbabilityOutput.label
-        Log.i("TAG", "Output: $highProbabilityOutput")
+            override fun onError(error: String) {
+                Toast.makeText(requireContext(), "Error: $error", Toast.LENGTH_SHORT).show()
+                Log.e("TAG", "Classification Error: $error")
+            }
+        })
     }
 
     override fun onDestroyView() {

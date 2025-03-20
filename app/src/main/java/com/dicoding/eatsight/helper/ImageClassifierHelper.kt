@@ -1,109 +1,37 @@
 package com.dicoding.eatsight.helper
 
-import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.ImageDecoder
-import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
 import android.util.Log
-import com.dicoding.eatsight.R
-import org.tensorflow.lite.DataType
-import org.tensorflow.lite.support.common.ops.CastOp
-import org.tensorflow.lite.support.image.ImageProcessor
+import com.dicoding.eatsight.ml.FoodsModel
 import org.tensorflow.lite.support.image.TensorImage
-import org.tensorflow.lite.support.image.ops.ResizeOp
-import org.tensorflow.lite.task.core.BaseOptions
-import org.tensorflow.lite.task.vision.classifier.Classifications
-import org.tensorflow.lite.task.vision.classifier.ImageClassifier
 
-class ImageClassifierHelper(
-    private var threshold: Float = 0.1f,
-    private var maxResults: Int = 3,
-    private val modelName: String = "food_classification.tflite",
-    private val context: Context,
-    private val classifierListener: ClassifierListener?
-) {
-    private var imageClassifier: ImageClassifier? = null
+class ImageClassifierHelper(private val context: Context) {
 
-    interface ClassifierListener{
+    interface ClassifierListener {
+        fun onResults(result: String)
         fun onError(error: String)
-        fun onResults(
-            results: List<Classifications>?,
-            inferenceTime: Long
-        )
     }
 
-    init {
-        setupImageClassifier()
-    }
-
-    private fun setupImageClassifier() {
-        val optionsBuilder = ImageClassifier.ImageClassifierOptions.builder()
-            .setScoreThreshold(threshold)
-            .setMaxResults(maxResults)
-        val baseOptionsBuilder = BaseOptions.builder()
-            .setNumThreads(4)
-        optionsBuilder.setBaseOptions(baseOptionsBuilder.build())
-
+    fun classifyImage(bitmap: Bitmap, listener: ClassifierListener) {
         try {
-            imageClassifier = ImageClassifier.createFromFileAndOptions(
-                context,
-                modelName,
-                optionsBuilder.build()
-            )
-        } catch (e: IllegalStateException) {
-            classifierListener?.onError(context.getString(R.string.image_classifier_failed))
-            Log.e(TAG, e.message.toString())
-        }
-    }
+            val foodsModel = FoodsModel.newInstance(context)
 
-    fun classifyStaticImage(imageUri: Uri, contentResolver: ContentResolver) {
-        if (imageClassifier == null) {
-            setupImageClassifier()
-        }
+            val newBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+            val tfImage = TensorImage.fromBitmap(newBitmap)
 
-        val imageProcessor = ImageProcessor.Builder()
-            .add(ResizeOp(224, 224, ResizeOp.ResizeMethod.NEAREST_NEIGHBOR))
-            .add(CastOp(DataType.UINT8))
-            .build()
+            val outputs = foodsModel.process(tfImage)
+                .probabilityAsCategoryList.apply {
+                    sortByDescending { it.score }
+                }
 
-        val tensorImage = toBitmap(imageUri, contentResolver)?.let {
-            imageProcessor.process(TensorImage.fromBitmap(it))
-        }
+            val highProbabilityOutput = outputs[0]
+            listener.onResults(highProbabilityOutput.label)
 
-        if (tensorImage != null) {
-            val startTime = System.currentTimeMillis()
-            val results = imageClassifier?.classify(tensorImage)
-
-            val endTime = System.currentTimeMillis()
-            val inferenceTime = endTime - startTime
-
-            classifierListener?.onResults(results, inferenceTime)
-        } else {
-            classifierListener?.onError("Failed to convert image to TensorImage")
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    private fun toBitmap(imageUri: Uri, contentResolver: ContentResolver): Bitmap? {
-        return try {
-            val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                val source = ImageDecoder.createSource(contentResolver, imageUri)
-                ImageDecoder.decodeBitmap(source)
-            } else {
-                MediaStore.Images.Media.getBitmap(contentResolver, imageUri)
-            }
-
-            if (bitmap.config != Bitmap.Config.ARGB_8888) {
-                bitmap.copy(Bitmap.Config.ARGB_8888, true)
-            } else {
-                bitmap
-            }
+            foodsModel.close()
         } catch (e: Exception) {
-            Log.e(TAG, "Error converting image to Bitmap: ${e.message}")
-            null
+            Log.e(TAG, "Classification failed: ${e.message}")
+            listener.onError("Classification failed: ${e.message}")
         }
     }
 

@@ -1,14 +1,14 @@
 package com.dicoding.eatsight.ui.home
 
-import android.net.Uri
+import android.graphics.Bitmap
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 
 class HomeViewModel : ViewModel() {
 
-    private val _currentImageUri = MutableLiveData<Uri?>()
-    val currentImageUri: LiveData<Uri?> = _currentImageUri
+    private val _currentImage = MutableLiveData<Bitmap?>()
+    val currentImage: LiveData<Bitmap?> = _currentImage
 
     private val _progressVisibility = MutableLiveData<Int>()
     val progressVisibility: LiveData<Int> = _progressVisibility
@@ -17,7 +17,7 @@ class HomeViewModel : ViewModel() {
         _progressVisibility.value = visibility
     }
 
-    fun setCurrentImageUri(uri: Uri?) {
-        _currentImageUri.value = uri
+    fun setCurrentImage(bitmap: Bitmap?) {
+        _currentImage.value = bitmap
     }
 }
