@@ -27,16 +27,15 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "11"
     }
     buildFeatures {
         viewBinding = true
         mlModelBinding = true
-        buildConfig = true
     }
 }
 
@@ -46,22 +45,18 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.constraintlayout)
-    implementation(libs.tensorflow.lite.support.v044)
-    implementation(libs.tensorflow.lite.metadata)
-    implementation(libs.androidx.ui.graphics.android)
-    implementation (libs.androidx.navigation.fragment.ktx)
-    implementation (libs.androidx.navigation.ui.ktx)
-    implementation(libs.tensorflow.lite.gpu)
+    implementation(libs.androidx.lifecycle.livedata.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.navigation.fragment.ktx)
+    implementation(libs.androidx.navigation.ui.ktx)
+    implementation(libs.androidx.activity)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation (libs.androidx.junit.v113)
-    implementation(libs.tensorflow.lite)
-    implementation(libs.tensorflow.lite.task.vision)
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
-    implementation(libs.androidx.lifecycle.livedata.ktx)
-    implementation(libs.androidx.activity.ktx)
-    implementation (libs.androidx.navigation.fragment.ktx.v260)
-    implementation (libs.androidx.navigation.ui.ktx)
-    implementation (libs.opencsv)
+    implementation(libs.androidx.core.ktx.v160)
+    implementation(libs.androidx.appcompat.v130)
+
+    implementation(libs.tensorflow.lite.support)
+    implementation(libs.tensorflow.lite.metadata)
+    implementation(libs.tensorflow.lite.task.vision.v043)
 }

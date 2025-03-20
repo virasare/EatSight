@@ -1,162 +1,138 @@
 package com.dicoding.eatsight.ui.home
 
+import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Intent
-import android.net.Uri
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.provider.MediaStore
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import com.dicoding.eatsight.R
 import com.dicoding.eatsight.databinding.FragmentHomeBinding
-import com.dicoding.eatsight.helper.ImageClassifierHelper
-import com.dicoding.eatsight.ui.result.ResultActivity
-import org.tensorflow.lite.task.vision.classifier.Classifications
+import com.dicoding.eatsight.ml.FoodsModel
+import org.tensorflow.lite.support.image.TensorImage
 
-class HomeFragment : Fragment(), ImageClassifierHelper.ClassifierListener {
+class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
 
-    private val viewModel: HomeViewModel by lazy {
-        ViewModelProvider(this)[HomeViewModel::class.java]
-    }
-
-    private var currentImageUri: Uri? = null
-    private lateinit var imageClassifierHelper: ImageClassifierHelper
-
-    @Suppress("DEPRECATION")
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View {
-        _binding = FragmentHomeBinding.inflate(inflater, container, false)
-        val root: View = binding.root
-
-        imageClassifierHelper = ImageClassifierHelper(
-            context = requireContext(),
-            classifierListener = this
-        )
-
-        if (savedInstanceState != null) {
-            currentImageUri = savedInstanceState.getParcelable(KEY_IMAGE_URI)
-            val result = savedInstanceState.getString(KEY_CLASSIFICATION_RESULT)
-            val confidence = savedInstanceState.getFloat(KEY_CLASSIFICATION_CONFIDENCE, -1f)
-
-            result?.let {
-                viewModel.classificationResult(it, confidence)
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) {
+                Toast.makeText(requireContext(), "Permission granted", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(requireContext(), "Permission denied", Toast.LENGTH_LONG).show()
             }
         }
 
-        viewModel.currentImageUri.observe(viewLifecycleOwner) { uri ->
-            currentImageUri = uri
-            showImage()
-        }
+    private fun allPermissionsGranted(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            requireContext(),
+            android.Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+    }
 
-        viewModel.progressVisibility.observe(viewLifecycleOwner) { visibility ->
-            binding.progressIndicator.visibility = visibility
-        }
+    @SuppressLint("IntentReset")
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        val homeViewModel =
+            ViewModelProvider(this)[HomeViewModel::class.java]
 
-        viewModel.classificationResult.observe(viewLifecycleOwner) { result ->
-            val detectedResult = result.first
-            val confidenceScore = result.second
+        _binding = FragmentHomeBinding.inflate(inflater, container, false)
+        val root: View = binding.root
 
-            if (confidenceScore != -1f) {
-                val intent = Intent(requireContext(), ResultActivity::class.java).apply {
-                    putExtra(ResultActivity.EXTRA_IMAGE_URI, currentImageUri.toString())
-                    putExtra(ResultActivity.EXTRA_RESULT, detectedResult)
-                    putExtra(ResultActivity.EXTRA_CONFIDENCE_SCORE, confidenceScore)
-                }
-                startActivity(intent)
+        binding.cameraButton.setOnClickListener {
+            if (allPermissionsGranted()) {
+                takePicturePreview.launch(null)
             } else {
-                showToast(detectedResult)
+                requestPermissionLauncher.launch(android.Manifest.permission.CAMERA)
             }
         }
 
         binding.galleryButton.setOnClickListener {
-            startGallery()
-        }
-
-        binding.analyzeButton.setOnClickListener {
-            currentImageUri?.let {
-                analyzeImage(it)
-            } ?: run {
-                showToast(getString(R.string.empty_image_warning))
+            if (ContextCompat.checkSelfPermission(
+                    requireContext(),
+                    android.Manifest.permission.READ_EXTERNAL_STORAGE
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+                intent.type = "image/*"
+                val mimeTypes = arrayOf("image/jpeg", "image/png", "image/jpg")
+                intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
+                intent.flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                onresult.launch(intent)
+            } else {
+                requestPermissionLauncher.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE)
             }
         }
 
         return root
     }
 
-    private fun startGallery() {
-        launcherGallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-    }
+    private val takePicturePreview =
+        registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+            if (bitmap != null) {
+                binding.imageView.setImageBitmap(bitmap)
+                outputGenerator(bitmap)
+            }
+        }
 
-    private val launcherGallery = registerForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            currentImageUri = uri
-            showImage()
-            viewModel.setCurrentImageUri(uri)
-        } else {
-            Log.d("Photo Picker", "No media selected")
+    private val onresult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            Log.i("TAG", "Result: ${result.data} ${result.resultCode}")
+            onResultReceived(GALLERY_REQUEST_CODE, result)
+        }
+
+    private fun onResultReceived(requestCode: Int, result: androidx.activity.result.ActivityResult?) {
+        when (requestCode) {
+            GALLERY_REQUEST_CODE -> {
+                if (result?.resultCode == Activity.RESULT_OK) {
+                    result.data?.data?.let { uri ->
+                        Log.i("TAG", "onResultReceived: $uri")
+                        val bitmap = BitmapFactory.decodeStream(
+                            requireActivity().contentResolver.openInputStream(uri)
+                        )
+                        binding.imageView.setImageBitmap(bitmap)
+                        outputGenerator(bitmap)
+                    }
+                } else {
+                    Log.e("TAG", "Error selecting image")
+                }
+            }
         }
     }
 
-    private fun showImage() {
-        currentImageUri?.let {
-            Log.d("Image URI", "showImage: $it")
-            binding.previewImageView.setImageURI(it)
-        }
-    }
+    private fun outputGenerator(bitmap: Bitmap) {
+        val foodsModel = FoodsModel.newInstance(requireContext())
 
-    private fun analyzeImage(uri: Uri) {
-        binding.progressIndicator.visibility = View.VISIBLE
-        imageClassifierHelper.classifyStaticImage(uri, requireContext().contentResolver)
-    }
+        // Convert bitmap into tensor flow image
+        val newBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+        val tfImage = TensorImage.fromBitmap(newBitmap)
 
-    override fun onResults(results: List<Classifications>?, inferenceTime: Long) {
-        binding.progressIndicator.visibility = View.GONE
+        // Process the image using the trained model and sort it in descending order
+        val outputs = foodsModel.process(tfImage)
+            .probabilityAsCategoryList.apply {
+                sortByDescending { it.score }
+            }
 
-        if (results.isNullOrEmpty()) {
-            showToast(getString(R.string.image_classifier_failed))
-            return
-        }
+        // Getting result with highest probability
+        val highProbabilityOutput = outputs[0]
 
-        val topResult = results[0].categories.maxByOrNull { it.score }
-        val detectedResult = topResult?.label ?: getString(R.string.image_classifier_failed)
-        val confidenceScore = topResult?.score ?: -1f
-
-        val intent = Intent(requireContext(), ResultActivity::class.java).apply {
-            putExtra(ResultActivity.EXTRA_IMAGE_URI, currentImageUri.toString())
-            putExtra(ResultActivity.EXTRA_RESULT, detectedResult)
-            putExtra(ResultActivity.EXTRA_CONFIDENCE_SCORE, confidenceScore)
-        }
-        startActivity(intent)
-    }
-
-    override fun onError(error: String) {
-        binding.progressIndicator.visibility = View.GONE
-        showToast(error)
-    }
-
-    private fun showToast(message: String) {
-        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        outState.putParcelable(KEY_IMAGE_URI, currentImageUri)
-        val classification = viewModel.classificationResult.value
-        if (classification != null) {
-            outState.putString(KEY_CLASSIFICATION_RESULT, classification.first)
-            outState.putFloat(KEY_CLASSIFICATION_CONFIDENCE, classification.second)
-        }
+        // Setting output text
+        binding.resultHere.text = highProbabilityOutput.label
+        Log.i("TAG", "Output: $highProbabilityOutput")
     }
 
     override fun onDestroyView() {
@@ -165,8 +141,6 @@ class HomeFragment : Fragment(), ImageClassifierHelper.ClassifierListener {
     }
 
     companion object {
-        const val KEY_IMAGE_URI = "KEY_IMAGE_URI"
-        const val KEY_CLASSIFICATION_RESULT = "KEY_CLASSIFICATION_RESULT"
-        const val KEY_CLASSIFICATION_CONFIDENCE = "KEY_CLASSIFICATION_CONFIDENCE"
+        private const val GALLERY_REQUEST_CODE = 100
     }
 }
