@@ -39,9 +39,9 @@ class HistoryFragment : Fragment() {
             adapter.submitList(historyList)
         }
 
-        binding.clearHistoryButton.setOnClickListener {
-            historyViewModel.deleteAllHistory()
-        }
+//        binding.clearHistoryButton.setOnClickListener {
+//            historyViewModel.deleteAllHistory()
+//        }
 
         return binding.root
     }
