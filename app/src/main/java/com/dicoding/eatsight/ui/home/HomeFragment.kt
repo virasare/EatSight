@@ -54,7 +54,11 @@ class HomeFragment : Fragment() {
         }
 
         binding.cameraButton.setOnClickListener {
-            takePicturePreview.launch()
+            if (requireContext().checkSelfPermission(android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                takePicturePreview.launch()
+            } else {
+                requestPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+            }
         }
 
         binding.galleryButton.setOnClickListener {
@@ -70,6 +74,16 @@ class HomeFragment : Fragment() {
 
         return binding.root
     }
+
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                takePicturePreview.launch()
+            } else {
+                Toast.makeText(requireContext(), "Izin kamera ditolak!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
 
     private fun openGallery() {
         val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)

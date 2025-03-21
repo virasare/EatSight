@@ -1,13 +1,29 @@
 package com.dicoding.eatsight.ui.history
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.*
+import com.dicoding.eatsight.data.HistoryEntity
+import com.dicoding.eatsight.data.HistoryRepository
+import kotlinx.coroutines.launch
 
-class HistoryViewModel : ViewModel() {
+class HistoryViewModel(private val repository: HistoryRepository) : ViewModel() {
 
-    private val _text = MutableLiveData<String>().apply {
-        value = "This is dashboard Fragment"
+    val allHistory: LiveData<List<HistoryEntity>> = repository.allHistory
+
+    fun insertHistory(history: HistoryEntity) {
+        viewModelScope.launch {
+            repository.insertHistory(history)
+        }
     }
-    val text: LiveData<String> = _text
+
+    fun deleteAllHistory() {
+        viewModelScope.launch {
+            repository.deleteAllHistory()
+        }
+    }
+
+    fun deleteSingleHistory(history: HistoryEntity) {
+        viewModelScope.launch {
+            repository.deleteSingleHistory(history)
+        }
+    }
 }

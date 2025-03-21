@@ -1,7 +1,7 @@
 [versions]
 agp = "8.7.3"
-appcompatVersion = "1.3.0"
-coreKtxVersion = "1.6.0"
+appcompatVersion = "1.7.0"
+coreKtxVersion = "1.15.0"
 datastorePreferences = "1.1.3"
 kotlin = "1.9.24"
 kotlinxCoroutinesAndroid = "1.7.3"
@@ -23,6 +23,8 @@ tensorflowLiteMetadata = "0.1.0"
 tensorflowLiteTaskVision = "0.4.4"
 activity = "1.10.1"
 tensorflowLiteTaskVisionVersion = "0.4.3"
+room = "2.6.1"
+glide = "4.16.0"
 
 [libraries]
 androidx-appcompat-v130 = { module = "androidx.appcompat:appcompat", version.ref = "appcompatVersion" }
@@ -49,6 +51,12 @@ tensorflow-lite-task-vision-v043 = { module = "org.tensorflow:tensorflow-lite-ta
 
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
+
+glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide" }
+
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

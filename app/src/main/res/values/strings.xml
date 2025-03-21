@@ -16,6 +16,7 @@
     <string name="title_app">Input you</string>
     <string name="instruction_message">"Image Analysis for Your Food!!"</string>
     <string name="unknown_food">Unknown Food</string>
+    <string name="timestamp">dd/mm/yyyy</string>
 
     <string name="theme">Theme</string>
     <string name="enable_theme">Enable theme</string>
