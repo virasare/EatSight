@@ -16,7 +16,7 @@
 ### 1. Clone Repository (Opsional)
 ```sh
 # Jika ingin menyimpan source code
-$ git clone https://github.com/username/EatSight.git
+$ git clone https://github.com/virasare/EatSight.git
 $ cd EatSight
 ```
 ### 2. Buka di Android Studio
