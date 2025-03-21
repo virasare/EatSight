@@ -19,7 +19,7 @@
         android:theme="@style/Theme.EatSight"
         tools:targetApi="31">
         <activity
-            android:name=".ui.ResultActivity"
+            android:name=".ui.result.ResultActivity"
             android:exported="false" />
         <activity
             android:name=".MainActivity"
